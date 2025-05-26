@@ -1,0 +1,68 @@
+# Git
+.git
+.gitignore
+.gitmodules
+
+# Documentation
+doc/
+*.md
+README*
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Data directories (will be mounted as volumes)
+PASTES/
+CRAWLED_SCREENSHOT/
+IMAGES/
+Blooms/
+Dicos/
+HASHS/
+logs/
+data/
+
+# Local config files
+*.log
+*.pid
+*.sock
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker files in subfolders
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Test files
+tests/
+test_*
+*_test.py
+
+# Temporary files
+tmp/
+temp/
+*.tmp
