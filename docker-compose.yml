@@ -1,0 +1,75 @@
+version: '3.8'
+services:
+  redis-cache:
+    image: redis:6-alpine
+    command: ["redis-server", "--port", "6379"]
+    volumes:
+      - redis_cache_data:/data
+    networks: 
+      - ail-net
+    restart: unless-stopped
+
+  redis-log:
+    image: redis:6-alpine
+    command: ["redis-server", "--port", "6380"]
+    volumes:
+      - redis_log_data:/data
+    networks: 
+      - ail-net
+    restart: unless-stopped
+
+  redis-work:
+    image: redis:6-alpine
+    command: ["redis-server", "--port", "6381"]
+    volumes:
+      - redis_work_data:/data
+    networks: 
+      - ail-net
+    restart: unless-stopped
+  kvrocks:
+    image: kvrocks/kvrocks:latest
+    command: ["./bin/kvrocks", "-c", "/opt/kvrocks/kvrocks.conf"]
+    volumes:
+      - ./data/kvrocks:/opt/kvrocks/data
+      - ./kvrocks.conf:/opt/kvrocks/kvrocks.conf
+    networks: 
+      - ail-net
+    restart: unless-stopped
+  ail-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      FLASK_HOST: 0.0.0.0
+      FLASK_PORT: 7000
+      AIL_HOME: /opt/ail
+      AIL_BIN: /opt/ail/bin
+      AIL_FLASK: /opt/ail/var/www
+    ports:
+      - "7000:7000"
+    volumes:
+      - ./data/pastes:/opt/ail/PASTES
+      - ./data/screenshots:/opt/ail/CRAWLED_SCREENSHOT
+      - ./data/images:/opt/ail/IMAGES
+      - ./data/logs:/opt/ail/logs
+      - ./data/blooms:/opt/ail/Blooms
+      - ./data/hashs:/opt/ail/HASHS
+      - ./configs:/opt/ail/configs
+      - ./bin:/opt/ail/bin
+    networks: 
+      - ail-net
+    depends_on:
+      - redis-cache
+      - redis-log
+      - redis-work
+      - kvrocks
+    restart: no
+
+volumes:
+  redis_cache_data:
+  redis_log_data:
+  redis_work_data:
+
+networks:
+  ail-net:
+    driver: bridge
