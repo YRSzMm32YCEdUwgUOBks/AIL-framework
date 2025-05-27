@@ -1,3 +1,4 @@
+name: ail
 services:
   redis-cache:
     image: redis:6-alpine
@@ -35,52 +36,14 @@ services:
     networks:
       - ail-net
     restart: unless-stopped
-
-  # Tor proxy for Lacus .onion crawling
-  tor_proxy:
-    image: osminogin/tor-simple:latest
-    networks:
-      - ail-net
-    restart: unless-stopped
-
-  # Valkey for Lacus (Redis alternative)
-  valkey:
-    image: valkey/valkey:8.0
-    command: ["valkey-server", "--port", "6385"]
-    volumes:
-      - valkey_data:/data
-    networks:
-      - ail-net
-    restart: unless-stopped
-
-  # Lacus crawler service
-  lacus:
-    build:
-      context: .
-      dockerfile: Dockerfile.lacus
-    environment:
-      LACUS_HOME: /opt/lacus
-      PYTHONPATH: /opt/lacus
-    ports:
-      - "7100:7100"    
-    volumes:
-      - ./data/lacus:/opt/lacus/data
-      - ./data/logs:/opt/lacus/logs
-      - ./configs/lacus/docker.generic.json:/opt/lacus/config/generic.json
-    networks:
-      - ail-net
-    depends_on:
-      - valkey
-      - tor_proxy
-    restart: no  
   init-lacus-url:
     image: redis:6-alpine
     depends_on:
       - kvrocks
-    entrypoint: ["sh", "-c", "redis-cli -h kvrocks -p 6383 HSET crawler:lacus url http://lacus:7100"]
+    entrypoint: ["sh", "-c", "redis-cli -h kvrocks -p 6383 HSET crawler:lacus url http://lacus-lacus-1:7100"]
     networks:
-      - ail-net
-    restart: "no"
+      - ail-net    
+    restart: no
 
   ail-app:
     build:
@@ -92,6 +55,7 @@ services:
       AIL_HOME: /opt/ail
       AIL_BIN: /opt/ail/bin
       AIL_FLASK: /opt/ail/var/www
+      MISP_KEY: ${MISP_KEY}
     ports:
       - "7000:7000"
     volumes:
@@ -102,7 +66,7 @@ services:
       - ./data/blooms:/opt/ail/Blooms
       - ./data/hashs:/opt/ail/HASHS
       - ./configs:/opt/ail/configs
-      - ./bin:/opt/ail/bin
+      - ./bin:/opt/ail/bin    
     networks:
       - ail-net
     depends_on:
@@ -110,15 +74,13 @@ services:
       - redis-log
       - redis-work
       - kvrocks
-      - lacus
-    restart: no
+    restart: unless-stopped
 
 volumes:
   redis_cache_data:
   redis_log_data:
   redis_work_data:
-  valkey_data:
 
 networks:
   ail-net:
-    driver: bridge
+    external: true
