@@ -66,7 +66,14 @@ git clone https://github.com/ail-project/ail-framework.git ail-framework
 cd ail-framework
 ```
 
-### 2. Launch AIL Stack
+### 2. Initialize Git Submodules
+```bash
+git submodule init
+git submodule update
+```
+This downloads YARA rules and MISP data required for tracker functionality.
+
+### 3. Launch AIL Stack
 ```bash
 # Build and start all services (first time)
 docker-compose up --build -d
@@ -75,7 +82,7 @@ docker-compose up --build -d
 docker-compose ps
 ```
 
-### 3. Verify Setup ✅
+### 4. Verify Setup ✅
 ```bash
 # Wait for services to initialize (2-3 minutes)
 sleep 180
@@ -87,7 +94,7 @@ curl http://localhost:7000/api/v1/health
 docker-compose logs ail-app --tail=50
 ```
 
-### 4. Access Web Interface 🌐
+### 5. Access Web Interface 🌐
 - **URL**: `http://localhost:7000`
 - **Default Login**: `ail@ail.test` / `ail`
 - **Dashboard**: Overview of system status and modules

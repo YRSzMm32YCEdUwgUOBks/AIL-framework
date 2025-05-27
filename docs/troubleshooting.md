@@ -308,6 +308,27 @@ If these troubleshooting steps don't resolve your issue:
 3. **Gather Information**: Run diagnostic commands and collect output
 4. **Report Issues**: Include logs, configuration, and system information
 
+## Tracker Internal Server Error
+
+**Symptoms:** 500 error when accessing `/tracker/add`, logs show `StopIteration` in `Tracker.py`
+
+**Cause:** Missing YARA rules - git submodules not initialized
+
+**Solution:**
+```bash
+git submodule init
+git submodule update
+docker-compose restart ail-app
+```
+
+The YARA rules directory (`bin/trackers/yara/ail-yara-rules/rules/`) must exist and contain rule files.
+
+## Missing MISP Data
+
+**Symptoms:** Issues with taxonomies or galaxy data
+
+**Solution:** Same as above - initialize git submodules to download MISP taxonomies and galaxy data.
+
 ## Useful Commands Reference
 
 ```bash
