@@ -1,0 +1,56 @@
+name: lacus
+services:
+  # Tor proxy for Lacus .onion crawling
+  tor_proxy:
+    image: osminogin/tor-simple:latest
+    networks:
+      - lacus-net
+    restart: unless-stopped
+
+  # Valkey for Lacus (Redis alternative)
+  valkey:
+    image: valkey/valkey:8.0
+    command: ["valkey-server", "--port", "6385"]
+    volumes:
+      - valkey_data:/data
+    networks:
+      - lacus-net
+    restart: unless-stopped
+  # Lacus crawler service
+  lacus:
+    build:
+      context: .
+      dockerfile: Dockerfile.lacus
+    environment:
+      LACUS_HOME: /opt/lacus
+      PYTHONPATH: /opt/lacus
+      NODE_OPTIONS: --max_old_space_size=4096
+    ports:
+      - "7100:7100"    
+    volumes:
+      - ./data/lacus:/opt/lacus/data
+      - ./data/logs:/opt/lacus/logs
+      - ./configs/lacus/docker.generic.json:/opt/lacus/config/generic.json
+    networks:
+      - lacus-net
+      - ail-net  # Connect to AIL network for communication
+    depends_on:
+      - valkey
+      - tor_proxy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 2G
+
+volumes:
+  valkey_data:
+
+networks:
+  lacus-net:
+    driver: bridge
+  ail-net:
+    external: true
+    name: ail-net
