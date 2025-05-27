@@ -27,6 +27,48 @@ echo "Starting AIL Framework..."
 echo "Flask Host: ${FLASK_HOST}"
 echo "Flask Port: ${FLASK_PORT}"
 
+# Validate essential submodules are initialized
+echo "Validating git submodules..."
+
+# Check YARA rules directory
+YARA_RULES_DIR="/opt/ail/bin/trackers/yara/ail-yara-rules/rules"
+if [ ! -d "$YARA_RULES_DIR" ] || [ -z "$(ls -A "$YARA_RULES_DIR" 2>/dev/null)" ]; then
+    echo "❌ ERROR: YARA rules not found!"
+    echo ""
+    echo "The AIL Framework requires git submodules to be initialized."
+    echo "Please run these commands on your HOST machine (not in container):"
+    echo ""
+    echo "  git submodule init"
+    echo "  git submodule update"
+    echo "  docker-compose restart ail-app"
+    echo ""
+    echo "This downloads essential YARA rules and MISP data."
+    echo "See README-Docker.md for complete setup instructions."
+    exit 1
+fi
+
+# Check MISP taxonomies
+MISP_TAXONOMIES_DIR="/opt/ail/files/misp-taxonomies"
+if [ ! -d "$MISP_TAXONOMIES_DIR" ] || [ -z "$(ls -A "$MISP_TAXONOMIES_DIR" 2>/dev/null)" ]; then
+    echo "❌ ERROR: MISP taxonomies not found!"
+    echo ""
+    echo "Please run: git submodule init && git submodule update"
+    echo "Then restart the container: docker-compose restart ail-app"
+    exit 1
+fi
+
+# Check MISP galaxy
+MISP_GALAXY_DIR="/opt/ail/files/misp-galaxy"
+if [ ! -d "$MISP_GALAXY_DIR" ] || [ -z "$(ls -A "$MISP_GALAXY_DIR" 2>/dev/null)" ]; then
+    echo "❌ ERROR: MISP galaxy not found!"
+    echo ""
+    echo "Please run: git submodule init && git submodule update"
+    echo "Then restart the container: docker-compose restart ail-app"
+    exit 1
+fi
+
+echo "✅ All required submodules found"
+
 # Change to AIL directory
 cd /opt/ail
 
