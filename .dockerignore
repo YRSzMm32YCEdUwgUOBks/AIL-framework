@@ -1,21 +1,16 @@
-# Git
+# Git metadata (exclude)
 .git
 .gitignore
 .gitmodules
 
-# Documentation
-doc/
-*.md
-README*
-
-# Development files
+# Development files (exclude)
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Python
+# Python cache and virtual environments (exclude)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -25,10 +20,11 @@ env/
 venv/
 ENV/
 .venv/
+AILENV/
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Data directories (will be mounted as volumes)
+# Runtime data directories (mounted as volumes, exclude from image)
 PASTES/
 CRAWLED_SCREENSHOT/
 IMAGES/
@@ -38,12 +34,12 @@ HASHS/
 logs/
 data/
 
-# Local config files
+# Runtime log files (exclude)
 *.log
 *.pid
 *.sock
 
-# OS generated files
+# OS generated files (exclude)
 .DS_Store
 .DS_Store?
 ._*
@@ -52,17 +48,27 @@ data/
 ehthumbs.db
 Thumbs.db
 
-# Docker files in subfolders
-docker-compose*.yml
-Dockerfile*
-.dockerignore
-
-# Test files
+# Test files (exclude)
 tests/
 test_*
 *_test.py
 
-# Temporary files
+# Temporary files (exclude)
 tmp/
 temp/
 *.tmp
+
+# Build artifacts (exclude)
+*.tar.gz
+*.zip
+build/
+dist/
+
+# KEEP THESE IMPORTANT FILES (explicitly include by NOT excluding):
+# ✅ configs/ - ALL configuration files including configs/docker/core.cfg
+# ✅ *.md - Documentation including README-Docker.md
+# ✅ docker-compose.yml - Main orchestration file
+# ✅ Dockerfile - Container build files
+# ✅ requirements.txt - Python dependencies
+# ✅ kvrocks.conf - Database configuration
+# ✅ docker-entrypoint.sh - Container startup script

@@ -13,8 +13,9 @@ from lib import ail_users
 
 if __name__ == "__main__":
 
-    user_id = 'admin@admin.test'
-    password = ail_users.gen_password()
+    user_id = 'ail@ail.test'
+    password = 'ail'
+    #password = ail_users.gen_password()
 
     # create role_list
     ail_users._create_roles()
@@ -22,10 +23,10 @@ if __name__ == "__main__":
     if not ail_users.exists_user(user_id):
         # Create Default Org
         org = ail_orgs.create_default_org()
-        ail_users.create_user(user_id, password=password, admin_id='admin@admin.test', org_uuid=org.get_uuid(), role='admin')
+        ail_users.create_user(user_id, password=password, admin_id=user_id, org_uuid=org.get_uuid(), role='admin')
     # EDIT Password
     else:
-        ail_users.edit_user('admin@admin.test', user_id, password=password, chg_passwd=True)
+        ail_users.edit_user('ail@ail.test', user_id, password=password, chg_passwd=True)
 
     token = ail_users.get_default_admin_token()
 
