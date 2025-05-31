@@ -154,4 +154,13 @@ RUN cd /opt/ail && \
 # Expose Flask port
 EXPOSE 7000
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+# Copy the azure entrypoint script
+COPY azure-entrypoint.sh /usr/local/bin/azure-entrypoint.sh
+RUN chmod +x /usr/local/bin/azure-entrypoint.sh
+
+# Copy the smart entrypoint script
+COPY smart-entrypoint.sh /usr/local/bin/smart-entrypoint.sh
+RUN chmod +x /usr/local/bin/smart-entrypoint.sh
+
+# Use smart entrypoint that auto-detects environment
+ENTRYPOINT ["/usr/local/bin/smart-entrypoint.sh"]

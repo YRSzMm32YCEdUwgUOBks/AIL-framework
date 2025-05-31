@@ -5,8 +5,8 @@
 set -e
 
 COMMAND=${1:-up}
-LACUS_COMPOSE="docker-compose.lacus.yml"
-MAIN_COMPOSE="docker-compose.yml"
+LACUS_COMPOSE="configs/docker/docker-compose.lacus.yml"
+MAIN_COMPOSE="configs/docker/docker-compose.ail.yml"
 
 case "$COMMAND" in
     up)

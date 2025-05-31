@@ -1,0 +1,41 @@
+# Development-Local Environment Overrides
+# For local development with Docker Compose - all services containerized locally
+# Use: docker-compose -f docker-compose.ail.yml -f docker-compose.dev-local.yml up
+
+services:
+  ail-app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.ail
+    environment:
+      - DEPLOYMENT_ENV=dev-local
+      - AIL_ENV=dev-local
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - FLASK_ENV=development
+      - FLASK_DEBUG=true
+      - PYTHONDONTWRITEBYTECODE=1
+      - LACUS_URL=http://lacus:7100
+    volumes:
+      # Mount source code for development hot-reload
+      - ../../bin:/opt/ail/bin
+      - ../../configs:/opt/ail/configs
+      - ../../var:/opt/ail/var
+      # Development-specific logs
+      - ../../logs:/opt/ail/logs
+    ports:
+      # Expose debug ports
+      - "7000:7000"   # AIL Web Interface
+      - "5678:5678"   # Python debugger (ptvsd)
+    command: >
+      bash -c "        echo 'Starting AIL Framework in DEV-LOCAL mode...' &&
+        echo 'Environment: dev-local (local Docker development)' &&
+        echo 'Debug mode enabled, hot-reload active' &&
+        /opt/ail/smart-entrypoint.sh
+      "
+  redis-cache:
+    image: redis:6-alpine
+    environment:
+      - REDIS_SAVE=60 1000  # More frequent saves in dev
+    volumes:
+      - ../../data/redis-dev:/data
