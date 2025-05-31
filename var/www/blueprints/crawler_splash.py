@@ -712,7 +712,11 @@ def domains_search_date_post():
 @login_read_only
 def domains_explorer_vanity_clusters():
     nb_min = request.args.get('min', 4)
-    if int(nb_min) < 0:
+    try:
+        nb_min = int(nb_min)
+    except (ValueError, TypeError):
+        nb_min = 4
+    if nb_min < 0:
         nb_min = 4
     vanity_clusters = Domains.get_vanity_clusters(nb_min=nb_min)
     return render_template("explorer_vanity_clusters.html", vanity_clusters=vanity_clusters,
@@ -724,8 +728,12 @@ def domains_explorer_vanity_clusters():
 def domains_explorer_vanity_explore():
     vanity = request.args.get('vanity')
     nb_min = request.args.get('min', 2)   # TODO SHOW DOMAINS OPTIONS + HARD CODED DOMAINS LIMIT FOR RENDER
+    try:
+        nb_min = int(nb_min)
+    except (ValueError, TypeError):
+        nb_min = 2
     length = len(vanity)
-    if int(nb_min) < 0:
+    if nb_min < 0:
         nb_min = 4
     vanity_clusters = Domains.get_vanity_cluster(vanity, len_vanity=length+1, nb_min=nb_min)
     vanity_domains = Domains.get_vanity_domains(vanity, len_vanity=length, meta=True)

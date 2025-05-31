@@ -24,14 +24,46 @@ app = None
 config_loader = ConfigLoader.ConfigLoader()
 
 # REDIS #
-r_serv = config_loader.get_redis_conn("Redis_Queues")
-r_cache = config_loader.get_redis_conn("Redis_Cache")
-r_serv_log = config_loader.get_redis_conn("Redis_Log")
-r_serv_log_submit = config_loader.get_redis_conn("Redis_Log_submit")
+# Initialize connection variables as None - connections will be established lazily
+r_serv = None
+r_cache = None
+r_serv_log = None
+r_serv_log_submit = None
+r_serv_db = None
+r_serv_tags = None
 
-# # # # # # #
-r_serv_db = config_loader.get_db_conn("Kvrocks_DB")         # TODO remove redis call from blueprint
-r_serv_tags = config_loader.get_db_conn("Kvrocks_Tags")     # TODO remove redis call from blueprint
+def get_redis_connection(conn_type):
+    """Lazy loading of Redis connections to avoid blocking Flask startup"""
+    global r_serv, r_cache, r_serv_log, r_serv_log_submit, r_serv_db, r_serv_tags
+    
+    try:
+        if conn_type == "Redis_Queues" and r_serv is None:
+            r_serv = config_loader.get_redis_conn("Redis_Queues")
+            print("Connected to Redis_Queues")
+        elif conn_type == "Redis_Cache" and r_cache is None:
+            r_cache = config_loader.get_redis_conn("Redis_Cache")
+            print("Connected to Redis_Cache")
+        elif conn_type == "Redis_Log" and r_serv_log is None:
+            r_serv_log = config_loader.get_redis_conn("Redis_Log")
+            print("Connected to Redis_Log")
+        elif conn_type == "Redis_Log_submit" and r_serv_log_submit is None:
+            r_serv_log_submit = config_loader.get_redis_conn("Redis_Log_submit")
+            print("Connected to Redis_Log_submit")
+        elif conn_type == "Kvrocks_DB" and r_serv_db is None:
+            r_serv_db = config_loader.get_db_conn("Kvrocks_DB")
+            print("Connected to Kvrocks_DB")
+        elif conn_type == "Kvrocks_Tags" and r_serv_tags is None:
+            r_serv_tags = config_loader.get_db_conn("Kvrocks_Tags")
+            print("Connected to Kvrocks_Tags")
+        return True
+    except Exception as e:
+        print(f"Warning: Failed to connect to {conn_type}: {e}")
+        return False
+
+# Try to establish connections at startup, but don't fail if they're not available
+print("Attempting to establish database connections...")
+for conn_name in ["Redis_Queues", "Redis_Cache", "Redis_Log", "Redis_Log_submit", "Kvrocks_DB", "Kvrocks_Tags"]:
+    get_redis_connection(conn_name)
 
 sys.path.append('../../configs/keys')
 

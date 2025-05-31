@@ -63,10 +63,16 @@ from blueprints.objects_favicon import objects_favicon
 from blueprints.objects_file_name import objects_file_name
 from blueprints.api_rest import api_rest
 
+print("AIL Flask Server - Starting initialization...")
+print(f"Environment variables - AIL_HOME: {os.environ.get('AIL_HOME')}")
+print(f"Environment variables - AIL_BIN: {os.environ.get('AIL_BIN')}")
+print(f"Environment variables - AIL_FLASK: {os.environ.get('AIL_FLASK')}")
 
 Flask_dir = os.environ['AIL_FLASK']
+print(f"Flask directory: {Flask_dir}")
 
 # CONFIG #
+print("Loading configuration...")
 config_loader = ConfigLoader()
 baseUrl = config_loader.get_config_str("Flask", "baseurl")
 host = config_loader.get_config_str("Flask", "host")
@@ -79,8 +85,16 @@ try:
 except Exception:
     FLASK_PORT = 7000
 
+ssl_context = None
+
 # ========= REDIS =========#
-r_serv_db = config_loader.get_db_conn("Kvrocks_DB")
+try:
+    r_serv_db = config_loader.get_db_conn("Kvrocks_DB")
+    print("Successfully connected to Kvrocks_DB")
+except Exception as e:
+    print(f"Warning: Failed to connect to Kvrocks_DB: {e}")
+    print("Flask will continue startup, but some features may not work properly")
+    r_serv_db = None
 
 # logs
 log_dir = os.path.join(os.environ['AIL_HOME'], 'logs')
@@ -110,10 +124,28 @@ for handler in flask_logger.handlers:
 
 # =========  TLS  =========#
 
-ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-ssl_context.load_cert_chain(certfile=os.path.join(Flask_dir, 'server.crt'), keyfile=os.path.join(Flask_dir, 'server.key'))
-ssl_context.suppress_ragged_eofs = True
-# print(ssl_context.get_ciphers())
+ssl_context = None
+# Only enable SSL if certificates exist and SSL is explicitly enabled
+try:
+    ssl_enabled = config_loader.get_config_str("Flask", "ssl_enabled").lower() == "true"
+except:
+    ssl_enabled = False  # Default to False if not configured
+
+cert_file = os.path.join(Flask_dir, 'server.crt')
+key_file = os.path.join(Flask_dir, 'server.key')
+
+if ssl_enabled and os.path.exists(cert_file) and os.path.exists(key_file):
+    try:
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(certfile=cert_file, keyfile=key_file)
+        ssl_context.suppress_ragged_eofs = True
+        print(f"SSL enabled - using certificates: {cert_file}, {key_file}")
+    except Exception as e:
+        print(f"Warning: Failed to load SSL certificates: {e}")
+        print("Continuing without SSL...")
+        ssl_context = None
+else:
+    print("SSL disabled - running in HTTP mode")
 # =========       =========#
 
 Flask_config.app = Flask(__name__, static_url_path=baseUrl+'/static/')
@@ -297,13 +329,23 @@ def ws_dashboard(ws):
 
 
 # ========== INITIAL taxonomies ============
+print("Initializing default taxonomies...")
 default_taxonomies = ["infoleak", "gdpr", "fpf", "dark-web"]
 # enable default taxonomies
 for taxonomy in default_taxonomies:
-    Tag.enable_taxonomy_tags(taxonomy)
+    try:
+        Tag.enable_taxonomy_tags(taxonomy)
+        print(f"Enabled taxonomy: {taxonomy}")
+    except Exception as e:
+        print(f"Warning: Failed to enable taxonomy {taxonomy}: {e}")
 
 # ========== GIT Cache ============
-clear_git_meta_cache()
+print("Clearing git meta cache...")
+try:
+    clear_git_meta_cache()
+    print("Git meta cache cleared successfully")
+except Exception as e:
+    print(f"Warning: Failed to clear git meta cache: {e}")
 
 # r = [str(p) for p in app.url_map.iter_rules()]
 # for p in r:
@@ -312,4 +354,7 @@ clear_git_meta_cache()
 # ============ MAIN ============
 
 if __name__ == "__main__":
+    print(f"Starting Flask server on {host}:{FLASK_PORT}")
+    print(f"SSL enabled: {ssl_context is not None}")
+    print("Flask server starting...")
     app.run(host=host, port=FLASK_PORT, threaded=True, ssl_context=ssl_context)
