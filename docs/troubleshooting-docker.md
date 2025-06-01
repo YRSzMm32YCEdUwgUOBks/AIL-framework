@@ -2,6 +2,86 @@
 
 This guide covers common issues, solutions, and diagnostic procedures for the AIL Framework Docker deployment.
 
+## 🌍 Environment-Specific Troubleshooting
+
+### **Environment Detection Issues**
+
+```bash
+# Check current environment
+echo $DEPLOYMENT_ENV
+# OR
+echo $AIL_ENV
+
+# Validate environment configuration
+python bin/lib/environment_config.py --validate dev-local
+
+# Check environment file exists
+ls -la configs/environments/
+```
+
+### **Environment Configuration Problems**
+
+**❌ "Environment 'xyz' not supported"**
+- **Solution**: Use supported environments: `dev-local`, `test-cloud`, `prod-cloud`
+- **Check**: `python bin/lib/environment_config.py --list`
+
+**❌ "Configuration file not found"**
+- **Solution**: Ensure environment config files exist in `configs/environments/`
+- **Missing files**: Create from templates or restore from git
+
+**❌ "Environment variable substitution failed"**
+- **Solution**: Set required variables for your environment:
+  ```bash
+  # For test-cloud/prod-cloud
+  export AZURE_REDIS_HOST="your-redis.cache.windows.net"
+  export AZURE_REDIS_PASSWORD="your-password"
+  export LACUS_URL="https://your-lacus-instance.com"
+  ```
+
+### **Environment-Specific Issues**
+
+#### **dev-local Environment**
+- All services should be containerized
+- No external dependencies required
+- Debug mode enabled by default
+
+```bash
+# Check all containers are running
+docker-compose -f configs/docker/docker-compose.ail.yml \
+               -f configs/docker/docker-compose.dev-local.yml ps
+
+# View environment-specific logs
+docker-compose logs ail-app | grep "Environment: dev-local"
+```
+
+#### **test-cloud Environment** 
+- Requires external cloud services
+- Azure Redis connection needed
+- External Lacus crawler
+
+```bash
+# Test cloud service connectivity
+curl -f $AZURE_REDIS_HOST:6380 || echo "Redis not accessible"
+curl -f $LACUS_URL/health || echo "Lacus not accessible"
+
+# Check environment variables
+env | grep AZURE_
+env | grep LACUS_
+```
+
+#### **prod-cloud Environment**
+- Production-ready settings
+- Enhanced security
+- Enterprise features enabled
+
+```bash
+# Verify production configuration
+grep -i "debug.*false" configs/environments/prod-cloud.cfg
+grep -i "loglevel.*warning" configs/environments/prod-cloud.cfg
+```
+
+---
+
 ## Common Issues & Solutions
 
 ### ❌ "AIL not responding"
@@ -267,7 +347,7 @@ docker-compose up --build -d
 
 ### Enable Verbose Logging
 ```bash
-# Add to docker-compose.yml environment section:
+# Add to docker-compose.ail.yml environment section:
 # LOGLEVEL: DEBUG
 # AIL_DEBUG: 1
 

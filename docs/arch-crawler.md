@@ -1,5 +1,7 @@
 # AIL Framework - Crawler Architecture & Flow Analysis
 
+> **Note:** This document may be partially obsolete or redundant. For up-to-date crawler architecture and flow, see the main [Docker Setup Guide](usage-docker.md#web-crawler-usage-verified-working) and [deployment scenarios](usage-deployment-scenarios.md). Consider merging or pruning this file in the future.
+
 This document provides a complete technical analysis of the crawler implementation, including code execution flow, database interactions, and integration points.
 
 ## Overview
