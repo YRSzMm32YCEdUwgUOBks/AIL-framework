@@ -1,0 +1,141 @@
+#!/bin/bash
+# Simplified Azure Redis patch for Lacus
+
+echo "🔧 Starting Azure Redis patching for Lacus..."
+
+# Check if Azure Redis environment variables are available
+if [ -z "${REDIS_CACHE_HOST:-}" ] || [ -z "${REDIS_CACHE_PASSWORD:-}" ]; then
+    echo "⚠️  Azure Redis environment variables not found, skipping Redis patching"
+    exit 0
+fi
+
+echo "✅ Azure Redis configuration detected"
+echo "   Host: ${REDIS_CACHE_HOST}"
+echo "   Port: ${REDIS_CACHE_PORT:-6380}"
+
+# Find the poetry virtual environment
+cd /opt/lacus
+VENV_PATH=$(poetry env info --path 2>/dev/null)
+if [ -z "$VENV_PATH" ]; then
+    VENV_PATH=$(find /root/.cache/pypoetry/virtualenvs/ -name "lacus-*" -type d | head -1)
+fi
+
+if [ -z "$VENV_PATH" ] || [ ! -d "$VENV_PATH" ]; then
+    echo "❌ Could not find Poetry virtual environment"
+    exit 1
+fi
+
+echo "✅ Found Poetry venv at: $VENV_PATH"
+
+# Create a comprehensive Python patch script
+cat > /tmp/patch_lacus_redis.py << 'PYTHONEOF'
+#!/usr/bin/env python3
+import os
+import glob
+import re
+import sys
+
+def patch_file(file_path, patterns_replacements):
+    """Apply multiple pattern replacements to a file"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        original_content = content
+        modified = False
+        
+        for pattern, replacement in patterns_replacements:
+            new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE | re.DOTALL)
+            if new_content != content:
+                content = new_content
+                modified = True
+                print(f"   📝 Applied pattern in {file_path}")
+        
+        if modified:
+            # Create backup
+            with open(file_path + '.backup', 'w', encoding='utf-8') as f:
+                f.write(original_content)
+            
+            # Write patched content
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            return True
+        return False
+    except Exception as e:
+        print(f"❌ Error patching {file_path}: {e}")
+        return False
+
+def main():
+    venv_path = sys.argv[1] if len(sys.argv) > 1 else ""
+    if not venv_path:
+        print("❌ Virtual environment path required")
+        return
+    
+    # Azure Redis configuration from environment
+    redis_host = os.environ.get('REDIS_CACHE_HOST', 'localhost')
+    redis_port = os.environ.get('REDIS_CACHE_PORT', '6380')
+    redis_password = os.environ.get('REDIS_CACHE_PASSWORD', '')
+    redis_ssl = os.environ.get('REDIS_SSL', 'true').lower() == 'true'
+    
+    print(f"🔧 Patching for Azure Redis: {redis_host}:{redis_port}")
+    
+    # Find lacuscore monitoring file
+    monitoring_files = glob.glob(f"{venv_path}/lib/python*/site-packages/lacuscore/lacus_monitoring.py")
+    
+    for monitoring_file in monitoring_files:
+        print(f"🔧 Patching monitoring file: {monitoring_file}")
+        
+        patterns = [
+            # Fix Redis initialization in __init__ method
+            (r'(self\.redis\s*=\s*)redis\.Redis\([^)]*\)',
+             f'\\1redis.Redis(host="{redis_host}", port={redis_port}, password="{redis_password}", ssl={redis_ssl}, ssl_cert_reqs=None, db=1)'),
+            
+            # Remove UnixDomainSocketConnection import if present
+            (r'from redis\.connection import UnixDomainSocketConnection[\s]*\n', ''),
+            
+            # Add os import if not present
+            (r'^(?!.*import os)', 'import os\n'),
+        ]
+        
+        if patch_file(monitoring_file, patterns):
+            print(f"✅ Patched {monitoring_file}")
+    
+    # Find lacus main files
+    lacus_files = glob.glob(f"{venv_path}/lib/python*/site-packages/lacus/**/*.py", recursive=True)
+    
+    for lacus_file in lacus_files:
+        if 'lacus.py' in lacus_file or '__init__.py' in lacus_file:
+            print(f"🔧 Patching lacus file: {lacus_file}")
+            
+            patterns = [
+                # Replace ConnectionPool with UnixDomainSocketConnection
+                (r'ConnectionPool\(\s*connection_class=UnixDomainSocketConnection[^)]*\)',
+                 f'ConnectionPool(host="{redis_host}", port={redis_port}, password="{redis_password}", ssl={redis_ssl}, ssl_cert_reqs=None)'),
+                
+                # Replace Redis with unix_socket_path
+                (r'Redis\(unix_socket_path=[^)]*\)',
+                 f'Redis(host="{redis_host}", port={redis_port}, password="{redis_password}", ssl={redis_ssl}, ssl_cert_reqs=None, decode_responses=True)'),
+                
+                # Remove UnixDomainSocketConnection import
+                (r'from redis\.connection import UnixDomainSocketConnection[\s]*\n', ''),
+            ]
+            
+            if patch_file(lacus_file, patterns):
+                print(f"✅ Patched {lacus_file}")
+
+if __name__ == "__main__":
+    main()
+PYTHONEOF
+
+# Run the Python patch script
+cd /opt/lacus
+poetry run python /tmp/patch_lacus_redis.py "$VENV_PATH"
+
+echo "✅ Azure Redis patching complete!"
+
+# Start Lacus services
+echo "� Starting Lacus services..."
+cd /opt/lacus
+poetry run lacus --start
+echo "✅ Lacus started successfully!"

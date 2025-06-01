@@ -11,18 +11,66 @@ export AIL_BIN=/opt/ail/bin
 export AIL_FLASK=/opt/ail/var/www
 export PYTHONPATH=/opt/ail/bin:/opt/ail
 
-# Ensure configuration file exists (use Docker-specific config)
-echo "Using Docker-specific configuration..."
-cp /opt/ail/configs/docker/core.cfg /opt/ail/configs/core.cfg
+# Configure AIL based on deployment environment
+case "${DEPLOYMENT_ENV:-dev-local}" in    "test-cloud"|"prod-cloud"|"azure")
+        echo "${DEPLOYMENT_ENV^} Environment - using environment-specific configuration..."
+          # Set the config file path directly to the environment-specific config
+        ENV_CONFIG_FILE="/opt/ail/configs/environments/${DEPLOYMENT_ENV}.cfg"
+        if [ -f "$ENV_CONFIG_FILE" ]; then
+            echo "🔧 Using configuration file: $ENV_CONFIG_FILE"
+            export AIL_CONFIG="$ENV_CONFIG_FILE"
+            echo "✅ Environment-specific configuration set: $ENV_CONFIG_FILE"            
+            # Validate critical environment variables are set for cloud environments
+            if [ -n "${REDIS_CACHE_HOST:-}" ] && [ -n "${REDIS_CACHE_PORT:-}" ] && [ -n "${REDIS_CACHE_PASSWORD:-}" ]; then
+                echo "✅ Azure Redis Cache configured: ${REDIS_CACHE_HOST}:${REDIS_CACHE_PORT}"
+            else
+                echo "⚠️  Warning: Missing Azure Redis environment variables for ${DEPLOYMENT_ENV}"
+                echo "Required: REDIS_CACHE_HOST, REDIS_CACHE_PORT, REDIS_CACHE_PASSWORD"
+            fi
+            
+            if [ -n "${LACUS_URL:-}" ]; then
+                echo "✅ Lacus URL configured: ${LACUS_URL}"
+            else
+                echo "⚠️  Warning: LACUS_URL environment variable not set"
+            fi
+        else
+            echo "⚠️  Warning: Environment config file not found: $ENV_CONFIG_FILE"
+            echo "Available environment configs:"
+            ls -la /opt/ail/configs/environments/ 2>/dev/null || echo "  No environment configs directory found"            
+            # Fallback to azure.cfg if available (for backward compatibility)
+            if [ -f "/opt/ail/configs/azure.cfg" ]; then
+                echo "Falling back to legacy Azure config"
+                export AIL_CONFIG="/opt/ail/configs/azure.cfg"
+            else
+                echo "❌ ERROR: No environment configuration available for ${DEPLOYMENT_ENV}!"
+                exit 1
+            fi
+        fi
+        ;;
+    "dev-local"|*)
+        echo "Development Local Environment - using environment-specific configuration..."
+          # Set the config file path directly to the environment-specific config
+        ENV_CONFIG_FILE="/opt/ail/configs/environments/${DEPLOYMENT_ENV:-dev-local}.cfg"
+        if [ -f "$ENV_CONFIG_FILE" ]; then
+            echo "🔧 Using configuration file: $ENV_CONFIG_FILE"
+            export AIL_CONFIG="$ENV_CONFIG_FILE"
+            echo "✅ Environment-specific configuration set: $ENV_CONFIG_FILE"
+        else
+            echo "⚠️  Warning: Environment config file not found: $ENV_CONFIG_FILE"
+            echo "Available environment configs:"
+            ls -la /opt/ail/configs/environments/ 2>/dev/null || echo "  No environment configs directory found"
+            if [ -f "/opt/ail/configs/docker/core.cfg" ]; then
+                echo "Falling back to Docker config"
+                export AIL_CONFIG="/opt/ail/configs/docker/core.cfg"
+            else
+                echo "❌ ERROR: No fallback configuration available!"
+                exit 1
+            fi
+        fi
+        ;;
+esac
 
-# Create symbolic link for config in root directory if it doesn't exist
-if [ ! -f /opt/ail/core.cfg ]; then
-    ln -sf /opt/ail/configs/core.cfg /opt/ail/core.cfg
-fi
-
-# Point AIL config at our core.cfg
-export AIL_CONFIG="/opt/ail/core.cfg"
-
+echo "✅ AIL_CONFIG set to: ${AIL_CONFIG}"
 echo "Starting AIL Framework..."
 echo "Flask Host: ${FLASK_HOST}"
 echo "Flask Port: ${FLASK_PORT}"
@@ -89,27 +137,82 @@ sleep 10
 
 # Function to check if Redis is ready
 wait_for_redis() {
-    echo "Waiting for Redis to be ready..."
-    while ! python3 -c "import redis; r=redis.Redis(host='redis-cache', port=6379); r.ping()"; do
-        echo "Redis not ready yet, waiting..."
-        sleep 2
-    done
-    echo "Redis is ready!"
+    case "${DEPLOYMENT_ENV:-dev-local}" in
+        "test-cloud"|"prod-cloud")
+            if [ -n "${REDIS_CACHE_HOST:-}" ]; then
+                echo "Waiting for Azure Redis Cache to be ready..."
+                while ! python3 -c "import redis; r=redis.Redis(host='${REDIS_CACHE_HOST}', port=${REDIS_CACHE_PORT}, password='${REDIS_CACHE_PASSWORD}', ssl=True, ssl_cert_reqs=None); r.ping()"; do
+                    echo "Azure Redis Cache not ready yet, waiting..."
+                    sleep 2
+                done
+                echo "Azure Redis Cache is ready!"
+            else
+                echo "⚠️  Warning: ${DEPLOYMENT_ENV} environment but no Redis Cache configuration found"
+            fi
+            ;;
+        *)
+            echo "Waiting for local Redis to be ready..."
+            while ! python3 -c "import redis; r=redis.Redis(host='redis-cache', port=6379); r.ping()"; do
+                echo "Redis not ready yet, waiting..."
+                sleep 2
+            done
+            echo "Redis is ready!"
+            ;;
+    esac
 }
 
 # Function to check if Kvrocks is ready
 wait_for_kvrocks() {
-    echo "Waiting for Kvrocks to be ready..."
-    while ! python3 -c "import redis; r=redis.Redis(host='kvrocks', port=6383); r.ping()"; do
-        echo "Kvrocks not ready yet, waiting..."
-        sleep 2
-    done
-    echo "Kvrocks is ready!"
+    case "${DEPLOYMENT_ENV:-dev-local}" in
+        "test-cloud"|"prod-cloud")
+            echo "Azure Redis Cache will handle KVRocks functionality - skipping separate check"
+            ;;
+        *)
+            echo "Waiting for Kvrocks to be ready..."
+            while ! python3 -c "import redis; r=redis.Redis(host='kvrocks', port=6383); r.ping()"; do
+                echo "Kvrocks not ready yet, waiting..."
+                sleep 2
+            done
+            echo "Kvrocks is ready!"
+            ;;
+    esac
 }
 
 # Wait for databases to be ready
 wait_for_redis
 wait_for_kvrocks
+
+# Initialize Lacus URL in KVRocks database (equivalent to init-lacus-url service in Docker Compose)
+echo "Initializing Lacus URL in database..."
+if [ -n "${LACUS_URL:-}" ]; then
+    echo "Setting Lacus URL to: ${LACUS_URL}"    
+    case "${DEPLOYMENT_ENV:-dev-local}" in
+        "test-cloud"|"prod-cloud")
+            if [ -n "${REDIS_CACHE_HOST:-}" ]; then
+                # Using Azure Redis Cache for KVRocks functionality
+                python3 -c "
+import redis
+r = redis.Redis(host='${REDIS_CACHE_HOST}', port=${REDIS_CACHE_PORT}, password='${REDIS_CACHE_PASSWORD}', ssl=True, ssl_cert_reqs=None, decode_responses=True)
+r.hset('crawler:lacus', 'url', '${LACUS_URL}')
+print('✅ Lacus URL stored in Azure Redis Cache:', '${LACUS_URL}')
+"
+            else
+                echo "⚠️  Warning: ${DEPLOYMENT_ENV} environment but no Redis Cache configuration found"
+            fi
+            ;;
+        *)
+            # Using local KVRocks
+            python3 -c "
+import redis
+r = redis.Redis(host='kvrocks', port=6383, decode_responses=True)
+r.hset('crawler:lacus', 'url', '${LACUS_URL}')
+print('✅ Lacus URL stored in KVRocks:', '${LACUS_URL}')
+"
+            ;;
+    esac
+else
+    echo "⚠️  LACUS_URL environment variable not set, skipping Lacus URL initialization"
+fi
 
 # Create default user for development (only if it doesn't exist)
 echo "Creating default user for development..."

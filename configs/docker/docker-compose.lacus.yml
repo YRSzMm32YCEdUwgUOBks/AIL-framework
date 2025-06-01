@@ -15,11 +15,10 @@ services:
       - valkey_data:/data
     networks:
       - lacus-net
-    restart: unless-stopped
-  # Lacus crawler service
+    restart: unless-stopped  # Lacus crawler service
   lacus:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.lacus
     environment:
       LACUS_HOME: /opt/lacus
@@ -28,9 +27,9 @@ services:
     ports:
       - "7100:7100"    
     volumes:
-      - ./data/lacus:/opt/lacus/data
-      - ./data/logs:/opt/lacus/logs
-      - ./configs/lacus/docker.generic.json:/opt/lacus/config/generic.json
+      - ../../data/lacus:/opt/lacus/data
+      - ../../data/logs:/opt/lacus/logs
+      - ../../configs/lacus/docker.generic.json:/opt/lacus/config/generic.json
     networks:
       - lacus-net
       - ail-net  # Connect to AIL network for communication

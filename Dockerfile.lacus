@@ -4,6 +4,10 @@ FROM python:3.10-slim
 LABEL maintainer="AIL Project"
 WORKDIR /opt/lacus
 
+# Build arguments for conditional installs (defaults for local development)
+ARG INSTALL_VALKEY=true
+ARG INSTALL_TOR=true
+
 # Install system dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -20,7 +24,6 @@ RUN apt-get update && \
       libavcodec-extra \
       cmake \
       pkg-config \
-      libjemalloc-dev \
       dos2unix \
       && rm -rf /var/lib/apt/lists/*
 
@@ -31,25 +34,28 @@ RUN pipx install poetry && \
 # Add pipx binaries to PATH
 ENV PATH="/root/.local/bin:$PATH"
 
-# Install Tor (using Debian Bookworm repository)
-RUN wget -qO- https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc | gpg --dearmor -o /usr/share/keyrings/tor-archive-keyring.gpg && \
+# Install Tor (using Debian Bookworm repository) - only for local development
+RUN if [ "${INSTALL_TOR}" = "true" ]; then \
+    wget -qO- https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc | gpg --dearmor -o /usr/share/keyrings/tor-archive-keyring.gpg && \
     echo 'deb [signed-by=/usr/share/keyrings/tor-archive-keyring.gpg] https://deb.torproject.org/torproject.org bookworm main' >> /etc/apt/sources.list.d/tor.list && \
     echo 'deb-src [signed-by=/usr/share/keyrings/tor-archive-keyring.gpg] https://deb.torproject.org/torproject.org bookworm main' >> /etc/apt/sources.list.d/tor.list && \
     apt-get update && \
     apt-get install -y tor deb.torproject.org-keyring && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*; \
+fi
 
-# Clone and install Valkey (Redis alternative)
-RUN git clone https://github.com/valkey-io/valkey.git /opt/valkey && \
+# Clone and install Valkey (Redis alternative) only if INSTALL_VALKEY is true (i.e., for local development)
+RUN if [ "${INSTALL_VALKEY}" = "true" ]; then \
+    apt-get install -y --no-install-recommends libjemalloc-dev && \
+    git clone https://github.com/valkey-io/valkey.git /opt/valkey && \
     cd /opt/valkey && \
     git checkout 8.0 && \
     make && \
-    make install
+    make install; \
+fi
 
-# Clone Lacus repository
-RUN git clone https://github.com/ail-project/lacus.git /opt/lacus-src && \
-    cp -r /opt/lacus-src/* /opt/lacus/ && \
-    rm -rf /opt/lacus-src
+# Use the local lacus-src directory instead
+COPY lacus-src/ /opt/lacus/
 
 # Install Python dependencies using Poetry
 RUN cd /opt/lacus && \
@@ -67,34 +73,26 @@ RUN echo "LACUS_HOME=/opt/lacus" >> /opt/lacus/.env
 RUN cd /opt/lacus && \
     cp ./config/logging.json.sample ./config/logging.json
 
+# Copy Lacus configuration from project
+COPY configs/lacus/docker.generic.json /opt/lacus/config/generic.json
+
 # Create necessary directories
-RUN mkdir -p /opt/lacus/data /opt/lacus/logs
+RUN mkdir -p /opt/lacus/data /opt/lacus/logs /opt/lacus/config
 
 # Initialize Lacus (non-interactive mode)
 RUN cd /opt/lacus && \
     echo 'no' | poetry run update --init
 
-# Create startup script
-RUN echo '#!/bin/bash\n\
-cd /opt/lacus\n\
-echo "Starting Lacus..."\n\
-poetry run start --loglevel INFO\n\
-\n\
-# Keep the container running by monitoring the processes\n\
-echo "Lacus services started. Monitoring processes..."\n\
-while true; do\n\
-    # Check if the main services are still running\n\
-    if ! pgrep -f "start_website" > /dev/null || ! pgrep -f "capture_manager" > /dev/null; then\n\
-        echo "Critical service stopped. Restarting Lacus..."\n\
-        poetry run start --loglevel INFO\n\
-    fi\n\
-    sleep 30\n\
-done\n\
-' > /opt/lacus/start-lacus.sh && \
-    chmod +x /opt/lacus/start-lacus.sh
+# Copy Azure Redis patch
+COPY lacus-azure-redis.patch /opt/lacus/lacus-azure-redis.patch
+RUN chmod +x /opt/lacus/lacus-azure-redis.patch
+
+# Copy improved startup script
+COPY start-lacus.sh /opt/lacus/start-lacus.sh
+RUN chmod +x /opt/lacus/start-lacus.sh
 
 # Fix any line ending issues
-RUN dos2unix /opt/lacus/start-lacus.sh 2>/dev/null || true
+RUN dos2unix /opt/lacus/start-lacus.sh /opt/lacus/lacus-azure-redis.patch 2>/dev/null || true
 
 # Expose Lacus port
 EXPOSE 7100

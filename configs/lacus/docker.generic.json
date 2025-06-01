@@ -18,7 +18,6 @@
       "password": ""
     },
     "allow_headed": false,
-    "wireproxy_path": "/not/used/in/docker",
     "_notes": {
         "loglevel": "Can be one of the value listed here: https://docs.python.org/3/library/logging.html#levels",
         "website_listen_ip": "IP Flask will listen on. Defaults to 0.0.0.0, meaning all interfaces.",

@@ -1,0 +1,62 @@
+# Test-Cloud Environment Overrides  
+# For cloud-based testing and staging deployments
+# Use: docker-compose -f docker-compose.ail.yml -f docker-compose.test-cloud.yml up
+
+services:
+  ail-app:
+    environment:
+      - DEPLOYMENT_ENV=test-cloud
+      - AIL_ENV=test-cloud
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - FLASK_ENV=testing
+      - FLASK_DEBUG=false
+      - TESTING=true
+    volumes:
+      # Test-specific configuration and data
+      - ../../configs:/opt/ail/configs:ro  # Read-only configs
+      - ../../logs:/opt/ail/logs
+      - ../../data/test:/opt/ail/data
+    ports:
+      - "7000:7000"
+    command: >
+      bash -c "        echo 'Starting AIL Framework in TEST-CLOUD mode...' &&
+        echo 'Environment: test-cloud (cloud testing)' &&
+        echo 'Production-like settings with test data' &&
+        /opt/ail/smart-entrypoint.sh
+      "
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7000/healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis-cache:
+    environment:
+      - REDIS_SAVE=300 10  # Less frequent saves for testing
+      - REDIS_MAXMEMORY=256mb
+      - REDIS_MAXMEMORY_POLICY=allkeys-lru
+    volumes:
+      - ../../data/redis-test:/data
+
+  # Add test-specific services
+  test-runner:
+    image: ail-framework:latest
+    environment:
+      - DEPLOYMENT_ENV=test
+      - PYTHONPATH=/opt/ail
+    volumes:
+      - ../../tests:/opt/ail/tests
+      - ../../configs:/opt/ail/configs:ro
+    command: >
+      bash -c "
+        echo 'Running AIL Framework tests...' &&
+        python -m pytest /opt/ail/tests/ -v --tb=short
+      "
+    depends_on:
+      - ail-app
+      - redis-cache
+    profiles:
+      - testing
+    # Could add test-specific services here like test databases

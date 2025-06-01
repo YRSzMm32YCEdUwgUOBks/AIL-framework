@@ -26,29 +26,28 @@ services:
     networks:
       - ail-net
     restart: unless-stopped
-
   kvrocks:
     image: kvrocks/kvrocks:latest
     command: ["./bin/kvrocks", "-c", "/opt/kvrocks/kvrocks.conf"]
     volumes:
-      - ./data/kvrocks:/opt/kvrocks/data
-      - ./kvrocks.conf:/opt/kvrocks/kvrocks.conf
+      - ../../data/kvrocks:/opt/kvrocks/data
+      - ../../kvrocks.conf:/opt/kvrocks/kvrocks.conf
     networks:
       - ail-net
     restart: unless-stopped
+    
   init-lacus-url:
     image: redis:6-alpine
     depends_on:
       - kvrocks
-    entrypoint: ["sh", "-c", "redis-cli -h kvrocks -p 6383 HSET crawler:lacus url http://lacus-lacus-1:7100"]
+    entrypoint: ["sh", "-c", "redis-cli -h kvrocks -p 6383 HSET crawler:lacus url http://lacus-lacus-1:7100"]    
     networks:
       - ail-net    
     restart: no
-
   ail-app:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: Dockerfile.ail
     environment:
       FLASK_HOST: 0.0.0.0
       FLASK_PORT: 7000
@@ -59,14 +58,14 @@ services:
     ports:
       - "7000:7000"
     volumes:
-      - ./data/pastes:/opt/ail/PASTES
-      - ./data/screenshots:/opt/ail/CRAWLED_SCREENSHOT
-      - ./data/images:/opt/ail/IMAGES
-      - ./data/logs:/opt/ail/logs
-      - ./data/blooms:/opt/ail/Blooms
-      - ./data/hashs:/opt/ail/HASHS
-      - ./configs:/opt/ail/configs
-      - ./bin:/opt/ail/bin    
+      - ../../data/pastes:/opt/ail/PASTES
+      - ../../data/screenshots:/opt/ail/CRAWLED_SCREENSHOT
+      - ../../data/images:/opt/ail/IMAGES
+      - ../../data/logs:/opt/ail/logs
+      - ../../data/blooms:/opt/ail/Blooms
+      - ../../data/hashs:/opt/ail/HASHS
+      - ../../configs:/opt/ail/configs
+      - ../../bin:/opt/ail/bin
     networks:
       - ail-net
     depends_on:

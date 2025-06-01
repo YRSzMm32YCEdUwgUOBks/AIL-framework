@@ -67,7 +67,7 @@ dist/
 # KEEP THESE IMPORTANT FILES (explicitly include by NOT excluding):
 # ✅ configs/ - ALL configuration files including configs/docker/core.cfg
 # ✅ *.md - Documentation including README-Docker.md
-# ✅ docker-compose.yml - Main orchestration file
+# ✅ docker-compose.ail.yml - Main orchestration file
 # ✅ Dockerfile - Container build files
 # ✅ requirements.txt - Python dependencies
 # ✅ kvrocks.conf - Database configuration

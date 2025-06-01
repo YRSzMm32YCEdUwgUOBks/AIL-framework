@@ -1,0 +1,25 @@
+# Azure Developer CLI (azd) template to deploy AIL Framework to Azure
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: ail-framework
+metadata:
+  template: ail-framework@0.0.1-beta
+  
+services:  ail:
+    project: .
+    language: python
+    host: containerapp
+    docker:
+      dockerfile: Dockerfile.ail
+  lacus:
+    project: .
+    language: python
+    host: containerapp
+    docker:
+      dockerfile: Dockerfile.lacus
+      buildArgs:
+        - INSTALL_VALKEY=false
+        - INSTALL_TOR=false
+infra:
+  provider: bicep
+  path: infra
